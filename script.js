@@ -6,6 +6,8 @@ const buscarCep = document.querySelector('#buscarCep');
 
 const estado = document.querySelector('#estado');
 
+const cidade = document.querySelector('#cidade');
+
 // Notificação do Busca CEP (Endereço encontrado ou não)
 
 function mensagem(texto, tipo = "sucesso") {
@@ -49,7 +51,7 @@ buscarCep.addEventListener("click", async function() {
 
 // Ouvir o evento de submit do formulário e cria um Array de objetos
 
-form.addEventListener("submmit", function(event) {
+form.addEventListener("submit", function(event) {
     event.preventDefault();
 
     console.log(Object.fromEntries([...form.elements]
@@ -60,26 +62,56 @@ form.addEventListener("submmit", function(event) {
     form.reset();
 });
 
-// Carrega os Estados no campo, como Dropdown
+// Carrega os Estados disponíveis na API
+
+async function carregarEstados() {
+    try {
+        cidade.disabled = true;
+        const resposta = await fetch("https://servicodados.ibge.gov.br/api/v1/localidades/estados?orderBy=nome");
+        if (!resposta.ok) {
+            throw new Error("Não foi possivel carregar os Estados.");
+        };
+        
+        const estados = await resposta.json();
+        estados.forEach(item => adicionarOpcao(estado, item.nome, item.sigla)
+    );
+} catch (erro) {
+    mensagem(erro.message, "erro");
+    
+}};
+
+// Mostra os Estados no campo, como Dropdown
 
 function adicionarOpcao(select, texto, valor) {
     select.add(new Option(texto, valor));
 };
 
-// Carrega os Estados disponíveis na API
+// Carrega as Cidades, baseadas nos Estados disponíveis na API
 
-async function carregarEstados() {
+estado.addEventListener("change", async function() {
+    cidade.replaceChildren(new Option("Carregando cidades ...", ""));
+    if (!estado.value) {
+        cidade.replaceChildren(new Option("Selecione o estado primeiro", ""));
+        return;
+    };
+
     try {
-        const respostaEstados = await fetch("https://servicodados.ibge.gov.br/api/v1/localidades/estados?orderBy=nome");
-        if (!respostaEstados.ok) {
-            throw new Error("Não foi possivel carregar os Estados.");
+        const resposta = await fetch(`https://servicodados.ibge.gov.br/api/v1/localidades/estados/${estado.value}/municipios`);
+        if (!resposta.ok) {
+            throw new Error("Não foi possivel carregar as cidades");
         };
 
-        const estados = await respostaEstados.json();
-            estados.forEach(item => adicionarOpcao(estado, item.nome, item.sigla)
-        );
+        const cidades = await resposta.json();
+        cidade.replaceChildren(new Option("Selecione a cidade", ""));
+        cidades.forEach(item => adicionarOpcao(cidade, item.nome, item.nome));
+        if (cidade.dataset.localidade) {
+            cidade.value = cidade.dataset.localidade;
+            delete cidade.dataset.localidade;
+        };
+        cidade.disabled = false;
 
-    } catch (erro) {};
-};
+    } catch(erro) {};
+
+});
 
 carregarEstados();
